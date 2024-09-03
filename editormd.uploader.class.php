@@ -40,7 +40,7 @@ class EditorMdUploader
      * @return  viod
      */
 
-    public function __construct($savePath, $saveURL, $formats, $randomNameType = 1, $randomLength = '', $cover = true, $maxSize = 1024)
+    public function __construct($savePath, $saveURL, $formats, $randomNameType = 1, $randomLength = '', $cover = true, $maxSize = 10240)
     {
         $this->savePath = $savePath;
         $this->saveURL = $saveURL;

@@ -103,6 +103,20 @@ class Plugin implements PluginInterface
             _t('如果你所用的主题没有使用到Aplayer及MetingJS,请开启此选项')
         ));
         $form->addInput(new Text(
+            's3_config',
+            null,
+            '',
+            _t('配置s3 存储'),
+            _t('格式为: endpoint|bucket_name|access_key_id|access_key_secret, 四项配置信息分别是: 上传地址|存储桶名称|访问id|访问密钥，以"|"分割。配置s3存储后，在使用图片上传功能时会自动上传至s3远程存储中备份。')
+        ));
+        // $form->addInput(new Radio(
+        //     'use_remote_cdn_url',
+        //     [self::RADIO_DISABLE => _t('不开启'), self::RADIO_ENABLE => _t('开启')],
+        //     self::RADIO_DISABLE,
+        //     _t('是否使用远程资源地址'),
+        //     _t('如果你未配置 s3, 请不要开启此选项')
+        // ));
+        $form->addInput(new Text(
             'static_cdn',
             null,
             '',
