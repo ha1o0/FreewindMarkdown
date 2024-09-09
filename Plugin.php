@@ -109,6 +109,13 @@ class Plugin implements PluginInterface
             _t('配置s3 存储'),
             _t('格式为: endpoint|bucket_name|access_key_id|access_key_secret, 四项配置信息分别是: 上传地址|存储桶名称|访问id|访问密钥，以"|"分割。配置s3存储后，在使用图片上传功能时会自动上传至s3远程存储中备份。')
         ));
+        $form->addInput(new Text(
+            'cdn_prefix_config',
+            null,
+            '',
+            _t('配置图片资源路径前缀'),
+            _t('格式为: old_prefix|new_prefix, 分别是: 当前资源前缀|要替换为的资源前缀，以"|"分割。适用场景是，如果你的图片有备份至 cdn（如上面的s3）,那么可以直接替换此前缀来加速图片渲染速度，也方便博客迁移更换cdn之类')
+        ));
         // $form->addInput(new Radio(
         //     'use_remote_cdn_url',
         //     [self::RADIO_DISABLE => _t('不开启'), self::RADIO_ENABLE => _t('开启')],
@@ -150,6 +157,40 @@ class Plugin implements PluginInterface
      */
     public static function personalConfig(Form $form)
     {
+    }
+
+    /**
+     * 对配置了 cdn 图片前缀的进行前缀替换
+     */
+    public static function handleImgPrefix($content)
+    {
+        $cdnPrefixConfig = Helper::options()->plugin('FreewindMarkdown')->cdn_prefix_config;
+        if (!$cdnPrefixConfig) {
+            return $content;
+        }
+        $prefixArray = explode('|', $cdnPrefixConfig);
+        if (count($prefixArray) !== 2) {
+            return $content;
+        }
+        $oldPrefix = $prefixArray[0];
+        $newPrefix = $prefixArray[1];
+
+        // 正则表达式匹配 <img> 标签并捕获 src 属性的内容
+        $pattern = '/(<img[^>]+src=[\'"])([^\'"]+)([\'"][^>]*>)/i';
+
+        // 使用 preg_replace_callback 进行替换
+        $content = preg_replace_callback($pattern, function ($matches) use ($oldPrefix, $newPrefix) {
+            // $matches[2] 是 src 的 URL，检查是否以 $oldPrefix 开头
+            if (strpos($matches[2], $oldPrefix) === 0) {
+                // 替换旧的前缀为新的前缀
+                $newSrc = $newPrefix . substr($matches[2], strlen($oldPrefix));
+                return $matches[1] . $newSrc . $matches[3];
+            }
+            // 不替换，返回原始匹配项
+            return $matches[0];
+        }, $content);
+
+        return $content;
     }
 
     public static function optionFooter()
@@ -211,16 +252,16 @@ class Plugin implements PluginInterface
         <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_aplyer): ?>
         <link rel="stylesheet"
               href="<?php echo self::markdownCdn('lib/APlayer/APlayer.min.css') ?>">
-    <?php endif; ?>
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_font): ?>
-        <link href="<?php echo self::markdownCdn('lib/font-awesome/css/font-awesome.min.css') ?>"
-              rel="stylesheet">
-    <?php endif; ?>
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_mathjax): ?>
-        <link rel="stylesheet"
-              href="<?php echo self::markdownCdn('lib/katex/katex.min.css') ?>">
-    <?php endif; ?>
-        <?php
+        <?php endif; ?>
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_font): ?>
+            <link href="<?php echo self::markdownCdn('lib/font-awesome/css/font-awesome.min.css') ?>"
+                rel="stylesheet">
+        <?php endif; ?>
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_mathjax): ?>
+            <link rel="stylesheet"
+                href="<?php echo self::markdownCdn('lib/katex/katex.min.css') ?>">
+        <?php endif; ?>
+            <?php
     }
 
     public static function indexFooter()
@@ -236,65 +277,65 @@ class Plugin implements PluginInterface
              data-value="<?php echo Helper::options()->plugin('FreewindMarkdown')->is_available_code ?>"></div>
         <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_jquery): ?>
         <script src="<?php echo self::markdownCdn('lib/jquery/jquery-3.5.1.min.js') ?>"></script>
-    <?php endif ?>
+        <?php endif ?>
 
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_mathjax): ?>
-        <script src="<?php echo self::markdownCdn('lib/katex/katex.min.js') ?>"></script>
-        <script src="<?php echo self::markdownCdn('lib/katex/contrib/auto-render.min.js') ?>"></script>
-    <?php endif; ?>
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_flowchart): ?>
-        <script src="<?php echo self::markdownCdn('lib/editormd/lib/raphael.min.js') ?>"></script>
-        <script src="<?php echo self::markdownCdn('lib/editormd/lib/flowchart.min.js') ?>"></script>
-    <?php endif; ?>
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_sequencediagram): ?>
-        <script src="<?php echo self::markdownCdn('lib/editormd/lib/underscore.min.js') ?>"></script>
-        <script src="<?php echo self::markdownCdn('lib/editormd/lib/sequence-diagram.min.js') ?>"></script>
-    <?php endif; ?>
-        <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_aplyer): ?>
-        <script src="<?php echo self::markdownCdn('lib/APlayer/APlayer.min.js') ?>"></script>
-        <script src="<?php echo self::markdownCdn('lib/MetingJS/Meting.js') ?>"></script>
-    <?php endif; ?>
-        <script>
-            $(function () {
-                if ($('#fw-is-available-mathjax').data('value') === 1) {
-                    renderMathInElement(document.body, {
-                        delimiters: [
-                            {left: '$$', right: '$$', display: true},
-                            {left: '$', right: '$', display: false},
-                            {left: '\\(', right: '\\)', display: false},
-                            {left: '\\[', right: '\\]', display: true}
-                        ],
-                        throwOnError: false
-                    });
-                }
-                if ($('#fw-is-available-code').data('value') === 1) {
-                    $("#fw-article-content").on('click', '.fwh .fwthead', function () {
-                        $(this).parent().children('.fwthead').removeClass('fwcurrent')
-                        $(this).addClass('fwcurrent')
-                        $(this).parent().parent().find('.fwtbody').hide()
-                        $(this).parent().parent().find(`.fwtbody-${$(this).data('target')}`).stop().fadeIn()
-                    })
-                    $("#fw-article-content .fwtab .fwh .fwthead:first-child").click()
-                }
-                if ($('#fw-is-available-flowchart').data('value') === 1) {
-                    $('#fw-article-content code.lang-flow').each((index, element) => {
-                        chart = flowchart.parse($(element).text());
-                        $(element).parent().after(`<div id="canvas-${index}"></div>`).remove()
-                        chart.drawSVG(`canvas-${index}`);
-                        $(`#canvas-${index}`).prev('.mac-bar').remove()
-                    })
-                }
-                if ($('#fw-is-available-sequencediagram').data('value') === 1) {
-                    $('#fw-article-content code.lang-seq').each((index, element) => {
-                        let code = $(element).text()
-                        $(element).parent().after(`<div id="seq-${index}">${code}</div>`).remove()
-                        $(`#seq-${index}`).sequenceDiagram({theme: 'simple'});
-                        $(`div#seq-${index}`).prev('.mac-bar').remove()
-                    })
-                }
-            })
-        </script>
-        <?php
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_mathjax): ?>
+            <script src="<?php echo self::markdownCdn('lib/katex/katex.min.js') ?>"></script>
+            <script src="<?php echo self::markdownCdn('lib/katex/contrib/auto-render.min.js') ?>"></script>
+        <?php endif; ?>
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_flowchart): ?>
+            <script src="<?php echo self::markdownCdn('lib/editormd/lib/raphael.min.js') ?>"></script>
+            <script src="<?php echo self::markdownCdn('lib/editormd/lib/flowchart.min.js') ?>"></script>
+        <?php endif; ?>
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->is_available_sequencediagram): ?>
+            <script src="<?php echo self::markdownCdn('lib/editormd/lib/underscore.min.js') ?>"></script>
+            <script src="<?php echo self::markdownCdn('lib/editormd/lib/sequence-diagram.min.js') ?>"></script>
+        <?php endif; ?>
+            <?php if (Helper::options()->plugin('FreewindMarkdown')->auto_import_aplyer): ?>
+            <script src="<?php echo self::markdownCdn('lib/APlayer/APlayer.min.js') ?>"></script>
+            <script src="<?php echo self::markdownCdn('lib/MetingJS/Meting.js') ?>"></script>
+        <?php endif; ?>
+            <script>
+                $(function () {
+                    if ($('#fw-is-available-mathjax').data('value') === 1) {
+                        renderMathInElement(document.body, {
+                            delimiters: [
+                                {left: '$$', right: '$$', display: true},
+                                {left: '$', right: '$', display: false},
+                                {left: '\\(', right: '\\)', display: false},
+                                {left: '\\[', right: '\\]', display: true}
+                            ],
+                            throwOnError: false
+                        });
+                    }
+                    if ($('#fw-is-available-code').data('value') === 1) {
+                        $("#fw-article-content").on('click', '.fwh .fwthead', function () {
+                            $(this).parent().children('.fwthead').removeClass('fwcurrent')
+                            $(this).addClass('fwcurrent')
+                            $(this).parent().parent().find('.fwtbody').hide()
+                            $(this).parent().parent().find(`.fwtbody-${$(this).data('target')}`).stop().fadeIn()
+                        })
+                        $("#fw-article-content .fwtab .fwh .fwthead:first-child").click()
+                    }
+                    if ($('#fw-is-available-flowchart').data('value') === 1) {
+                        $('#fw-article-content code.lang-flow').each((index, element) => {
+                            chart = flowchart.parse($(element).text());
+                            $(element).parent().after(`<div id="canvas-${index}"></div>`).remove()
+                            chart.drawSVG(`canvas-${index}`);
+                            $(`#canvas-${index}`).prev('.mac-bar').remove()
+                        })
+                    }
+                    if ($('#fw-is-available-sequencediagram').data('value') === 1) {
+                        $('#fw-article-content code.lang-seq').each((index, element) => {
+                            let code = $(element).text()
+                            $(element).parent().after(`<div id="seq-${index}">${code}</div>`).remove()
+                            $(`#seq-${index}`).sequenceDiagram({theme: 'simple'});
+                            $(`div#seq-${index}`).prev('.mac-bar').remove()
+                        })
+                    }
+                })
+            </script>
+            <?php
     }
 
     public static function parse($content)
@@ -333,6 +374,7 @@ class Plugin implements PluginInterface
                 $content = preg_replace('/{fwtab[ ]*}(<br>)*([\s\S]*?)(<br>)*{\/fwtab[ ]*}/', '<div class="fwtab">$2</div>', $content);
             }
         }
+        $content = self::handleImgPrefix($content);
         return '<div id="fw-article-content">' . $content . '</div>';
     }
 
